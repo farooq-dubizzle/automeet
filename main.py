@@ -15,27 +15,28 @@ def _show_error(msg):
 
 def main():
     from auth import get_credentials
+    from config import FROZEN, ACCESS_DENIED_MSG
 
     try:
         creds = get_credentials()
     except FileNotFoundError as e:
         _show_error(str(e))
         sys.exit(1)
-    except Exception as e:
-        _show_error(f"Google authentication failed:\n{e}")
+    except Exception:
+        _show_error(ACCESS_DENIED_MSG if FROZEN else "Google authentication failed.")
         sys.exit(1)
 
-    from calendar_client import CalendarClient
+    from calendar_client import build_service
     from tray_app import TrayApp
     from scheduler import MeetingScheduler
 
-    client = CalendarClient(creds)
+    service = build_service(creds)
     tray = TrayApp()
-    scheduler = MeetingScheduler(client, tray)
+    scheduler = MeetingScheduler(service, tray)
     tray.set_scheduler(scheduler)
 
     scheduler.start()
-    tray.run()  # blocks until Quit
+    tray.run()
 
     scheduler.stop()
     scheduler.join(timeout=5)

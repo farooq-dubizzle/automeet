@@ -2,7 +2,7 @@ import os
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-from config import SCOPES, CREDENTIALS_FILE, TOKEN_FILE
+from config import SCOPES, CREDENTIALS_FILE, TOKEN_FILE, FROZEN, ACCESS_DENIED_MSG
 
 
 def get_credentials():
@@ -26,12 +26,18 @@ def get_credentials():
         return creds
 
     if not os.path.exists(CREDENTIALS_FILE):
-        raise FileNotFoundError(
-            f"credentials.json not found at:\n{CREDENTIALS_FILE}"
-        )
+        if FROZEN:
+            raise RuntimeError(ACCESS_DENIED_MSG)
+        raise FileNotFoundError("Place credentials.json in the project folder.")
 
-    flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-    creds = flow.run_local_server(port=0)
+    try:
+        flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+        creds = flow.run_local_server(port=0)
+    except Exception as e:
+        if FROZEN:
+            raise RuntimeError(ACCESS_DENIED_MSG) from None
+        raise e
+
     _save_token(creds)
     return creds
 

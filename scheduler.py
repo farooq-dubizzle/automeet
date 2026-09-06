@@ -1,19 +1,18 @@
-import subprocess
+import os
 import threading
 from datetime import datetime, timezone
 
-from calendar_client import parse_event_start
-from link_extractor import extract_meeting_url
+from calendar_client import extract_meeting_url, get_todays_events, parse_event_start
 from config import CALENDAR_POLL_INTERVAL_SEC, SCHEDULER_TICK_SEC
 
 
 class MeetingScheduler(threading.Thread):
-    def __init__(self, calendar_client, tray_app):
+    def __init__(self, calendar_service, tray_app):
         super().__init__(daemon=True, name="MeetingScheduler")
-        self._calendar_client = calendar_client
+        self._service = calendar_service
         self._tray = tray_app
         self._stop_event = threading.Event()
-        self._wake_event = threading.Event()  # separate event for waking the sleep
+        self._wake_event = threading.Event()
         self._force_refresh = False
         self._lock = threading.Lock()
         self._joined = set()
@@ -30,10 +29,8 @@ class MeetingScheduler(threading.Thread):
                 self._force_refresh = False
 
             if do_refresh:
-                events = self._calendar_client.get_todays_events()
-                self._tray.update_events(events)
+                self._tray.update_events(get_todays_events(self._service))
                 self._last_fetch = time.monotonic()
-                print(f"[automeet] Fetched {len(events)} events for today")
 
             self._check_and_join()
             self._wake_event.wait(timeout=SCHEDULER_TICK_SEC)
@@ -47,15 +44,16 @@ class MeetingScheduler(threading.Thread):
                 continue
             try:
                 start = parse_event_start(event).astimezone(timezone.utc)
-            except Exception as e:
-                print(f"[automeet] Could not parse start for {event.get('summary')!r}: {e}")
+            except Exception:
                 continue
             delta = (start - now).total_seconds()
             if -SCHEDULER_TICK_SEC <= delta <= SCHEDULER_TICK_SEC:
                 url = extract_meeting_url(event)
                 if url:
-                    print(f"[automeet] Joining {event.get('summary')!r}: {url}")
-                    subprocess.Popen(["cmd", "/c", "start", "", url])
+                    try:
+                        os.startfile(url)
+                    except OSError:
+                        continue
                     self._joined.add(event_id)
 
     def force_refresh(self):
@@ -65,4 +63,4 @@ class MeetingScheduler(threading.Thread):
 
     def stop(self):
         self._stop_event.set()
-        self._wake_event.set()  # wake immediately so stop is responsive
+        self._wake_event.set()

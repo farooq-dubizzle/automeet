@@ -2,21 +2,14 @@ import os
 import threading
 
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image
 
-from calendar_client import parse_event_start
-from link_extractor import extract_meeting_url
+from calendar_client import extract_meeting_url, parse_event_start
 from config import ICON_PATH, APP_NAME
 
 
 def _load_icon():
-    if os.path.exists(ICON_PATH):
-        return Image.open(ICON_PATH).convert("RGBA")
-    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.ellipse([4, 4, 60, 60], fill=(34, 197, 94, 255))  # green circle
-    draw.text((18, 18), "M", fill=(255, 255, 255, 255))
-    return img
+    return Image.open(ICON_PATH).convert("RGBA")
 
 
 def _format_title(event):
@@ -34,10 +27,10 @@ def _format_title(event):
 class TrayApp:
     def __init__(self):
         self._events = []
-        self._enabled = {}  # event_id -> bool
+        self._enabled = {}
         self._lock = threading.Lock()
         self._icon = None
-        self._scheduler = None  # set by main.py after construction
+        self._scheduler = None
 
     def set_scheduler(self, scheduler):
         self._scheduler = scheduler
