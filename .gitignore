@@ -7,3 +7,5 @@ build/
 credentials.json
 client_secret*.json
 automeet_token.json
+assets/icon.iconset/
+.DS_Store
