@@ -1,4 +1,5 @@
 import threading
+from datetime import datetime
 
 import pystray
 from PIL import Image
@@ -34,6 +35,7 @@ class TrayApp:
     def __init__(self):
         self._events = []
         self._enabled = {}
+        self._show_all_meetings = False
         self._lock = threading.Lock()
         self._icon = None
         self._scheduler = None
@@ -82,6 +84,24 @@ class TrayApp:
         with self._lock:
             return [e for e in self._events if self._enabled.get(e["id"], True)]
 
+    def _visible_events(self, events):
+        if self._show_all_meetings:
+            return events
+        now = datetime.now().astimezone()
+        visible = []
+        for event in events:
+            try:
+                if parse_event_start(event).astimezone() >= now:
+                    visible.append(event)
+            except Exception:
+                visible.append(event)
+        return visible
+
+    def _toggle_show_filter(self, icon, item):
+        with self._lock:
+            self._show_all_meetings = not self._show_all_meetings
+        self._refresh_menu()
+
     def _toggle(self, event_id):
         with self._lock:
             self._enabled[event_id] = not self._enabled.get(event_id, True)
@@ -113,11 +133,26 @@ class TrayApp:
         with self._lock:
             events_snapshot = list(self._events)
             enabled_snapshot = dict(self._enabled)
+            show_all = self._show_all_meetings
 
-        if not events_snapshot:
-            items.append(pystray.MenuItem("No meetings scheduled today", None, enabled=False))
+        if show_all:
+            items.append(pystray.MenuItem("Show future meetings only", self._toggle_show_filter))
         else:
-            for index, event in enumerate(events_snapshot):
+            items.append(pystray.MenuItem("Show all meetings today", self._toggle_show_filter))
+        items.append(pystray.Menu.SEPARATOR)
+
+        visible_events = self._visible_events(events_snapshot)
+
+        if not visible_events:
+            if not events_snapshot:
+                empty_label = "No meetings scheduled today"
+            elif show_all:
+                empty_label = "No meetings scheduled today"
+            else:
+                empty_label = "No upcoming meetings today"
+            items.append(pystray.MenuItem(empty_label, None, enabled=False))
+        else:
+            for index, event in enumerate(visible_events):
                 eid = event["id"]
                 enabled = enabled_snapshot.get(eid, True)
                 url = extract_meeting_url(event)
@@ -151,7 +186,7 @@ class TrayApp:
                         )
                     )
 
-                if index < len(events_snapshot) - 1:
+                if index < len(visible_events) - 1:
                     items.append(pystray.Menu.SEPARATOR)
 
         items.append(pystray.Menu.SEPARATOR)

@@ -47,6 +47,8 @@ Click the menu bar icon to see today's meetings:
 ```
 Today's Meetings
 ─────────────────
+Show all meetings today
+─────────────────
 16:30 - Team Standup (auto-join on)
    Join Now
    Turn Off Auto-join
@@ -55,6 +57,7 @@ Refresh Calendar
 Quit AutoMeet
 ```
 
+- **Show all meetings today** / **Show future meetings only** — toggle between all of today's events and upcoming only (default: future only)
 - Click the meeting title or **Join Now** to open the link immediately
 - **Turn Off Auto-join** skips auto-open at the scheduled time
 - **Refresh Calendar** reloads events (picks up link changes, e.g. Meet → Zoom)

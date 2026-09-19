@@ -128,6 +128,6 @@ When someone can't sign in, add their Google account email as a test user in GCP
 
 **Windows:** Right-click the tray icon to see today's meetings. Uncheck any you don't want to auto-join.
 
-**macOS:** Click the menu bar icon. Each meeting shows its time and title. Use **Join Now** to open the link immediately, or **Turn Off Auto-join** to skip auto-open at start time. **Refresh Calendar** reloads events.
+**macOS:** Click the menu bar icon. By default only **upcoming** meetings are shown; click **Show all meetings today** to include past ones (or **Show future meetings only** to switch back). Each meeting shows its time and title. Use **Join Now** to open the link immediately, or **Turn Off Auto-join** to skip auto-open at start time. **Refresh Calendar** reloads events.
 
 Meetings with no conference link are shown but cannot be joined.
