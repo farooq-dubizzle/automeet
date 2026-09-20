@@ -1,7 +1,7 @@
 import threading
 from datetime import datetime, timezone
 
-from calendar_client import extract_meeting_url, get_todays_events, parse_event_start
+from calendar_client import event_join_key, extract_meeting_url, get_todays_events, parse_event_start
 from mac.config import (
     CALENDAR_POLL_INTERVAL_SEC,
     JOIN_WINDOW_AFTER_SEC,
@@ -43,7 +43,9 @@ class MeetingScheduler(threading.Thread):
                 self._force_refresh = False
 
             if do_refresh:
-                self._tray.update_events(get_todays_events(self._service))
+                events = get_todays_events(self._service)
+                self._tray.update_events(events)
+                self.prune_joined(events)
                 self._last_fetch = time.monotonic()
 
             self._check_and_join()
@@ -53,7 +55,6 @@ class MeetingScheduler(threading.Thread):
     def _check_and_join(self):
         now = datetime.now(timezone.utc)
         for event in self._tray.get_enabled_events():
-            event_id = event["id"]
             try:
                 start = parse_event_start(event).astimezone(timezone.utc)
             except Exception:
@@ -63,13 +64,14 @@ class MeetingScheduler(threading.Thread):
                 url = extract_meeting_url(event)
                 if not url:
                     continue
-                if self._joined.get(event_id) == url:
+                key = event_join_key(event)
+                if self._joined.get(key):
                     continue
                 try:
                     open_url(url)
                 except OSError:
                     continue
-                self._joined[event_id] = url
+                self._joined[key] = True
 
     def check_and_join_now(self):
         self._check_and_join()
@@ -79,11 +81,13 @@ class MeetingScheduler(threading.Thread):
 
         self._last_fetch = time.monotonic()
 
-    def mark_joined(self, event_id, url=None):
-        if url:
-            self._joined[event_id] = url
-        else:
-            self._joined[event_id] = True
+    def mark_joined(self, event):
+        self._joined[event_join_key(event)] = True
+
+    def prune_joined(self, events):
+        valid = {event_join_key(e) for e in events}
+        with self._lock:
+            self._joined = {k: v for k, v in self._joined.items() if k in valid}
 
     def force_refresh(self):
         with self._lock:
