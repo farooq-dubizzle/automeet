@@ -2,7 +2,7 @@ import os
 import threading
 from datetime import datetime, timezone
 
-from calendar_client import extract_meeting_url, get_todays_events, parse_event_start
+from calendar_client import event_join_key, extract_meeting_url, get_todays_events, parse_event_start
 from config import CALENDAR_POLL_INTERVAL_SEC, SCHEDULER_TICK_SEC
 
 
@@ -15,7 +15,7 @@ class MeetingScheduler(threading.Thread):
         self._wake_event = threading.Event()
         self._force_refresh = False
         self._lock = threading.Lock()
-        self._joined = set()
+        self._joined = {}
         self._last_fetch = 0.0
 
     def run(self):
@@ -29,7 +29,9 @@ class MeetingScheduler(threading.Thread):
                 self._force_refresh = False
 
             if do_refresh:
-                self._tray.update_events(get_todays_events(self._service))
+                events = get_todays_events(self._service)
+                self._tray.update_events(events)
+                self.prune_joined(events)
                 self._last_fetch = time.monotonic()
 
             self._check_and_join()
@@ -39,9 +41,6 @@ class MeetingScheduler(threading.Thread):
     def _check_and_join(self):
         now = datetime.now(timezone.utc)
         for event in self._tray.get_enabled_events():
-            event_id = event["id"]
-            if event_id in self._joined:
-                continue
             try:
                 start = parse_event_start(event).astimezone(timezone.utc)
             except Exception:
@@ -49,12 +48,21 @@ class MeetingScheduler(threading.Thread):
             delta = (start - now).total_seconds()
             if -SCHEDULER_TICK_SEC <= delta <= SCHEDULER_TICK_SEC:
                 url = extract_meeting_url(event)
-                if url:
-                    try:
-                        os.startfile(url)
-                    except OSError:
-                        continue
-                    self._joined.add(event_id)
+                if not url:
+                    continue
+                key = event_join_key(event)
+                if self._joined.get(key):
+                    continue
+                try:
+                    os.startfile(url)
+                except OSError:
+                    continue
+                self._joined[key] = True
+
+    def prune_joined(self, events):
+        valid = {event_join_key(e) for e in events}
+        with self._lock:
+            self._joined = {k: v for k, v in self._joined.items() if k in valid}
 
     def force_refresh(self):
         with self._lock:

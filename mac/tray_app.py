@@ -120,7 +120,7 @@ class TrayApp:
                 return
             open_url(url)
             if self._scheduler:
-                self._scheduler.mark_joined(event["id"], url)
+                self._scheduler.mark_joined(event)
 
         return action
 
@@ -213,6 +213,7 @@ class TrayApp:
         try:
             events = get_todays_events(self._scheduler._service)
             self.update_events(events)
+            self._scheduler.prune_joined(events)
             self._scheduler.mark_fetched()
             self._scheduler.check_and_join_now()
         except Exception:

@@ -5,7 +5,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 _URL_PATTERNS = [
-    re.compile(r"https://[a-z0-9]+\.zoom\.us/j/[^\s<>\"']+"),
+    re.compile(r"https://(?:[a-z0-9-]+\.)?zoom\.us/j/[^\s<>\"']+"),
     re.compile(r"https://teams\.microsoft\.com/l/meetup-join/[^\s<>\"']+"),
     re.compile(r"https://meet\.google\.com/[a-z\-]+"),
 ]
@@ -73,8 +73,22 @@ def extract_meeting_url(event):
     if url:
         return url
 
-    url = event.get("hangoutLink")
-    if url:
-        return url
+    text_url = _url_from_text_fields(event)
+    hangout = event.get("hangoutLink")
+    if text_url and hangout and "meet.google.com" in hangout and "zoom.us" in text_url:
+        # Zoom link in location/description; stale Meet hangoutLink left behind
+        return text_url
 
-    return _url_from_text_fields(event)
+    if hangout:
+        return hangout
+
+    return text_url
+
+
+def event_join_key(event):
+    """Unique key per scheduled occurrence — reschedules get a new start time."""
+    return (
+        event.get("id", ""),
+        event.get("start", {}).get("dateTime", ""),
+        extract_meeting_url(event) or "",
+    )
